@@ -1,0 +1,238 @@
+---
+title: "Read, triage, and act on Cairn security scan findings"
+description: "Understand the findings, trace, and meta sections in Cairn's output, evaluate confidence scores, export reports, and triage false positives."
+---
+
+After a scan completes, Cairn produces a structured results file alongside the console log. This guide explains how to read that output, distinguish real issues from false positives, export it in useful formats, and plug it into a broader reporting or remediation workflow.
+
+## Output structure
+
+Cairn writes results to a JSON file in the working directory (default: `cairn-results-<timestamp>.json`). The file has three top-level sections:
+
+```json
+{
+  "meta": { ... },
+  "findings": [ ... ],
+  "trace": [ ... ]
+}
+```
+
+<AccordionGroup>
+  <Accordion title="meta — run metadata" defaultOpen={true}>
+    Contains details about the scan itself: target, task description, start and end time, tool versions, and the model used for reasoning.
+
+    ```json
+    "meta": {
+      "target": "192.168.1.0/24",
+      "task": "Perform a full network reconnaissance and identify exploitable services",
+      "started_at": "2026-04-23T14:23:01Z",
+      "finished_at": "2026-04-23T14:51:44Z",
+      "cairn_version": "0.9.2",
+      "model": "gpt-4o",
+      "tools_used": ["nmap_scan", "service_fingerprint", "http_probe", "vuln_check"]
+    }
+    ```
+  </Accordion>
+  <Accordion title="findings — security findings">
+    An array of individual findings, one object per issue discovered. Each finding includes a severity, confidence score, affected host, description, evidence, and recommended action.
+
+    ```json
+    "findings": [
+      {
+        "id": "find-001",
+        "severity": "high",
+        "confidence": 0.91,
+        "title": "MySQL 5.7 exposed on public interface",
+        "host": "192.168.1.22",
+        "port": 3306,
+        "service": "mysql",
+        "description": "MySQL is listening on all interfaces (0.0.0.0:3306). No firewall rule is restricting access. An attacker with network access can attempt credential attacks or exploit known MySQL vulnerabilities.",
+        "evidence": {
+          "tool": "nmap_scan",
+          "raw": "3306/tcp open  mysql  MySQL 5.7.38"
+        },
+        "recommendation": "Bind MySQL to 127.0.0.1 and restrict port 3306 via firewall rules to authorized hosts only."
+      }
+    ]
+    ```
+  </Accordion>
+  <Accordion title="trace — reasoning and tool call log">
+    A chronological record of every tool call made and every reasoning step taken. Use this to understand why Cairn made specific decisions and to audit the scan.
+
+    ```json
+    "trace": [
+      {
+        "step": 1,
+        "type": "tool_call",
+        "tool": "nmap_scan",
+        "params": { "target": "192.168.1.0/24", "flags": "-sn" },
+        "result_summary": "14 live hosts discovered"
+      },
+      {
+        "step": 2,
+        "type": "reasoning",
+        "content": "14 hosts discovered. Proceeding to port scan each host. Prioritizing hosts with lower latency for initial probes."
+      }
+    ]
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Severity and confidence scores
+
+Each finding carries a `severity` label and a numeric `confidence` score between 0 and 1.
+
+| Severity | Meaning |
+|----------|---------|
+| `critical` | Immediate exploitability with significant impact (e.g., unauthenticated RCE) |
+| `high` | Serious issue that should be addressed in the current sprint |
+| `medium` | Real issue with limited impact or requiring specific conditions to exploit |
+| `low` | Minor risk or best-practice violation with minimal direct impact |
+| `info` | Informational — no direct security risk, but useful context |
+
+The confidence score reflects how certain Cairn is that the finding is real, based on the quality of evidence collected:
+
+| Score | Interpretation |
+|-------|---------------|
+| 0.90–1.00 | High confidence — multiple evidence sources confirm the finding |
+| 0.70–0.89 | Moderate confidence — primary evidence is clear; some ambiguity remains |
+| 0.50–0.69 | Low confidence — possible finding; manual verification is recommended |
+| Below 0.50 | Speculative — treat as a hypothesis, not a confirmed issue |
+
+<Tip>
+  Filter your review by severity first (`critical` and `high`), then work through `medium`. Low-confidence findings deserve scrutiny before you act on them.
+</Tip>
+
+## Distinguishing true positives from false positives
+
+Cairn's agent is accurate but not infallible. Use these checks to evaluate a finding before escalating or remediating it.
+
+<AccordionGroup>
+  <Accordion title="Check the evidence field">
+    Every finding includes raw evidence from the tool that produced it. Read the `evidence.raw` value and verify it supports the title and description. If the raw output is ambiguous or incomplete, treat the finding with skepticism.
+  </Accordion>
+  <Accordion title="Review the trace for reasoning">
+    Find the trace entries related to the finding's `id`. Look for the `reasoning` step that classified the issue. If the reasoning made an assumption (e.g., "version banner suggests X"), confirm that assumption manually.
+  </Accordion>
+  <Accordion title="Re-run the specific tool call">
+    Copy the tool parameters from the trace and run the underlying tool yourself (e.g., run the same `nmap` command manually). If your result differs from what Cairn recorded, the finding may be based on stale or misread output.
+  </Accordion>
+  <Accordion title="Watch for version-based findings">
+    CVE matching is based on banners and version strings, which are not always accurate. A service may report an older version string while running a patched build. Always verify version-based findings against the actual installed package version.
+  </Accordion>
+</AccordionGroup>
+
+## Exporting results
+
+Cairn supports exporting results to JSON (default) and Markdown. Use the `--export` flag after a run, or call the export command on an existing results file.
+
+<CodeGroup>
+
+```bash Export to JSON
+# JSON is written automatically; re-export to a specific path:
+python cairn.py export \
+  --input cairn-results-20260423-142301.json \
+  --format json \
+  --output reports/scan-report.json
+```
+
+```bash Export to Markdown
+python cairn.py export \
+  --input cairn-results-20260423-142301.json \
+  --format markdown \
+  --output reports/scan-report.md
+```
+
+```bash Export only findings above a threshold
+python cairn.py export \
+  --input cairn-results-20260423-142301.json \
+  --format markdown \
+  --min-severity medium \
+  --min-confidence 0.70 \
+  --output reports/confirmed-findings.md
+```
+
+</CodeGroup>
+
+The Markdown export produces a report with a summary table, per-finding sections with evidence, and a recommendations list — suitable for sharing with stakeholders or pasting into a ticket.
+
+## Follow-up actions for common finding types
+
+<AccordionGroup>
+  <Accordion title="Exposed management interfaces (SSH, RDP, MySQL, Redis)">
+    1. Verify the port is actually reachable from external networks using your own scan or a cloud-based probe.
+    2. Apply firewall rules to restrict access to authorized source IPs.
+    3. Rotate credentials for the service if it was exposed without authentication controls.
+    4. Enable fail2ban or equivalent brute-force protection.
+  </Accordion>
+  <Accordion title="Outdated or end-of-life software versions">
+    1. Confirm the running version using the package manager (e.g., `dpkg -l nginx`, `php --version`).
+    2. Check whether a patch is available upstream.
+    3. Upgrade to a supported version or apply vendor-provided workarounds.
+    4. If immediate upgrade is not possible, document the accepted risk and apply compensating controls.
+  </Accordion>
+  <Accordion title="Web application issues (exposed admin panels, missing auth)">
+    1. Manually browse to the reported path and confirm accessibility.
+    2. Assess whether authentication or IP restriction is missing.
+    3. Restrict access via web server configuration (e.g., `location /admin { allow 10.0.0.0/8; deny all; }`).
+    4. If the panel is legitimate, enforce strong credentials and MFA.
+  </Accordion>
+  <Accordion title="Informational findings (banners, headers, technology disclosure)">
+    These do not require immediate action but can assist an attacker in targeting exploits. Prioritize suppressing server version banners and `X-Powered-By` headers as a low-effort hardening step.
+  </Accordion>
+</AccordionGroup>
+
+## Integrating into a reporting workflow
+
+Cairn's JSON output is designed to be machine-readable for downstream tooling.
+
+```python
+import json
+
+with open("cairn-results-20260423-142301.json") as f:
+    results = json.load(f)
+
+# Filter confirmed high/critical findings
+confirmed = [
+    finding for finding in results["findings"]
+    if finding["severity"] in ("critical", "high")
+    and finding["confidence"] >= 0.75
+]
+
+for finding in confirmed:
+    print(f"[{finding['severity'].upper()}] {finding['title']} — {finding['host']}")
+    print(f"  Recommendation: {finding['recommendation']}")
+    print()
+```
+
+Common integration patterns:
+
+<CardGroup cols={2}>
+  <Card title="Ticket creation" icon="ticket">
+    Parse `findings` and open a Jira or GitHub issue per finding above your severity threshold, attaching the `evidence` and `recommendation` fields.
+  </Card>
+  <Card title="SIEM ingestion" icon="database">
+    Forward the `findings` array to your SIEM as structured events. Each finding maps cleanly to a log entry with host, severity, and description fields.
+  </Card>
+  <Card title="Diff between runs" icon="code-compare">
+    Compare `findings` across two scans to identify newly introduced issues or confirm that previously remediated findings no longer appear.
+  </Card>
+  <Card title="Executive summary" icon="file-lines">
+    Use the Markdown export with `--min-severity medium` as the basis for a stakeholder-facing report, adding context and risk ratings manually.
+  </Card>
+</CardGroup>
+
+<Note>
+  Cairn results are point-in-time snapshots. A clean report does not guarantee a clean environment — configurations change and new vulnerabilities are published continuously. Schedule regular scans and treat the output as one input into a broader security program.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Running a scan" icon="radar" href="/guides/running-a-scan">
+    Review the full scan workflow from target definition to safe shutdown
+  </Card>
+  <Card title="Custom tools" icon="wrench" href="/guides/custom-tools">
+    Extend Cairn to collect evidence types that the built-in toolset does not cover
+  </Card>
+</CardGroup>

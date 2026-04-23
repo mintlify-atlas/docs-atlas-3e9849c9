@@ -1,0 +1,116 @@
+---
+title: "Task planning: decomposing goals into executable steps"
+description: "Understand how Cairn decomposes a natural-language goal into a dependency-aware task graph and adapts when steps fail or produce unexpected results."
+---
+
+Cairn accepts goals written in plain language. Before executing anything, it runs a planning phase that converts a high-level objective — such as "identify all open services on the target and flag any with known vulnerabilities" — into a structured sequence of concrete, executable steps. This page explains how that planning works, how dependencies between steps are tracked, and how the plan evolves when things do not go as expected.
+
+## Receiving a goal
+
+You provide Cairn with a goal as a natural-language string. The agent reads this string and infers:
+
+- **Objective**: what a successful outcome looks like
+- **Scope**: which targets, domains, or IP ranges are in play
+- **Constraints**: any rules about rate limiting, excluded paths, or required approvals
+- **Output format**: whether you want a brief summary, a full report, or raw findings
+
+<Tip>
+  The more specific your goal, the more focused Cairn's plan will be. Broad goals like "test everything" produce wide task graphs and consume more tokens. Goals scoped to a specific service, protocol, or vulnerability class run faster and produce cleaner output.
+</Tip>
+
+## The planning phase
+
+Once the goal is understood, the agent enters the planning phase. It produces a **task graph** — a directed acyclic graph (DAG) where each node is a sub-task and each edge is a dependency.
+
+```text
+Goal: enumerate open ports, then identify services, then check for CVEs
+
+[ port_scan ]
+      |
+      v
+[ service_identification ]
+      |
+      v
+[ cve_lookup ]
+```
+
+Each sub-task specifies:
+- A **description** of what the step does
+- The **tool** or tool category expected to handle it
+- **Input dependencies** — which prior steps must complete before this one can start
+- **Expected output type** — what the agent expects to receive back
+
+<Note>
+  The task graph is not a rigid script. It is an initial plan that the agent treats as a starting point, not a fixed contract. Steps can be added, removed, or reordered during execution based on what the agent observes.
+</Note>
+
+## Dependency tracking
+
+Cairn enforces dependency ordering at runtime. A sub-task does not start until all of its declared inputs are available. This prevents race conditions where a later step tries to use data that has not been produced yet.
+
+<CardGroup cols={2}>
+  <Card title="Sequential steps" icon="arrow-down">
+    Steps with a strict ordering — such as scanning before exploiting — are linked by explicit dependencies. They run one after the other.
+  </Card>
+  <Card title="Parallel steps" icon="arrows-split-up-and-left">
+    Steps with no dependencies on each other can run concurrently. Cairn identifies these opportunities during planning and schedules them in parallel to reduce total runtime.
+  </Card>
+  <Card title="Conditional steps" icon="code-branch">
+    Some sub-tasks are created only if a prior step produces a specific result. For example, SQL injection testing is only scheduled if a web application is found during enumeration.
+  </Card>
+  <Card title="Blocked steps" icon="lock">
+    If a required dependency fails permanently, all sub-tasks that depend on it are marked as blocked rather than skipped silently. The final report identifies blocked steps and their root cause.
+  </Card>
+</CardGroup>
+
+## Re-planning
+
+When a step fails or returns output that does not match expectations, Cairn does not halt. Instead, the agent enters a re-planning loop.
+
+<Steps>
+  <Step title="Detect the anomaly">
+    The agent checks the tool's output against the expected output type for that sub-task. A non-zero exit code, an empty result set, or a format mismatch all trigger re-planning.
+  </Step>
+  <Step title="Diagnose the cause">
+    The LLM reasons about why the step failed. Common causes include: the target is unreachable, the tool requires different parameters, or the assumed service is not actually present.
+  </Step>
+  <Step title="Generate alternatives">
+    The agent proposes one or more alternative approaches: retry with adjusted parameters, substitute a different tool, or skip the step and annotate the finding as unconfirmed.
+  </Step>
+  <Step title="Update the task graph">
+    The chosen alternative is inserted into the task graph. Any steps that depended on the failed step are updated to reflect the new dependency chain.
+  </Step>
+  <Step title="Resume execution">
+    Cairn continues executing the updated plan from the point of failure. Earlier completed steps are not repeated.
+  </Step>
+</Steps>
+
+<Warning>
+  Re-planning consumes additional LLM tokens. In adversarial environments where many steps are expected to fail, set a re-planning budget to prevent runaway token usage.
+</Warning>
+
+## Feedback loops
+
+Cairn's planning is not a one-shot process. Intermediate results feed back into the plan continuously.
+
+For example:
+- A port scan returns 12 open ports. Cairn schedules one service-identification sub-task per port.
+- Service identification reveals an outdated Apache version on port 80. Cairn adds a CVE lookup and a web enumeration step.
+- Web enumeration finds a login form. Cairn schedules a credential-stuffing sub-task if that tool is available and in scope.
+
+This feedback-driven approach means the final task graph can look substantially different from the initial plan — and that is by design. The agent is exploring a problem space, not executing a predetermined script.
+
+<Info>
+  You can inspect the evolving task graph at any time during a run. Cairn logs each planning decision with the reasoning the LLM used to make it, giving you full visibility into why the plan changed.
+</Info>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Tool use" icon="wrench" href="/concepts/tool-use">
+    See how Cairn selects, invokes, and chains the tools that execute each sub-task.
+  </Card>
+  <Card title="Penetration testing workflow" icon="shield-halved" href="/concepts/penetration-workflow">
+    Walk through the end-to-end phases Cairn automates during a security assessment.
+  </Card>
+</CardGroup>

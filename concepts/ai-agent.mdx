@@ -1,0 +1,104 @@
+---
+title: "AI agents in Cairn: reasoning, memory, and autonomy"
+description: "Learn how Cairn uses a large language model as its reasoning core, how it stores findings across tasks, and where human oversight still matters."
+---
+
+At the heart of Cairn is an AI agent — a software process that perceives its environment, reasons about what to do next, and acts by invoking tools or making decisions. Unlike traditional scripted automation, Cairn's agent adapts its behavior based on what it observes, which makes it capable of handling tasks that cannot be fully anticipated in advance.
+
+## The LLM reasoning core
+
+Cairn uses a large language model (LLM) as its central reasoning engine. The model receives a structured prompt describing the current task, the available tools, and any observations gathered so far. It then produces a decision: which tool to call, what arguments to pass, or whether the current step is complete.
+
+This reasoning loop runs continuously until the agent determines that the goal has been achieved or that it cannot make further progress without additional information.
+
+<CardGroup cols={2}>
+  <Card title="Goal interpretation" icon="bullseye">
+    The LLM reads a natural-language goal and infers the intent, constraints, and expected output format before taking any action.
+  </Card>
+  <Card title="Decision making" icon="code-branch">
+    At each step, the model selects the next action from available tools, grounding its choice in prior observations and the current task state.
+  </Card>
+  <Card title="Self-correction" icon="rotate">
+    When a tool returns an error or unexpected output, the model revises its plan rather than halting, mimicking how a skilled analyst adjusts on the fly.
+  </Card>
+  <Card title="Structured output" icon="list-check">
+    The model produces structured outputs — tool calls, sub-task results, and final reports — rather than unstructured prose, so downstream components can parse them reliably.
+  </Card>
+</CardGroup>
+
+## Agent memory
+
+An agent's memory determines what it knows at any given moment. Cairn distinguishes between two kinds of memory:
+
+### Short-term memory: the context window
+
+Everything the agent currently "holds in mind" lives in the LLM's context window. This includes the original goal, the plan, tool call history, and all observations made so far. The context window has a finite size — once it fills up, older information must be summarized or discarded.
+
+Cairn manages the context window by:
+- Compressing earlier observations into summaries when the window approaches its limit
+- Keeping the most recent and most relevant tool outputs in full detail
+- Injecting task metadata (scope, target, phase) at the top of every prompt so critical constraints are never lost
+
+### Long-term memory: stored findings
+
+Results that need to persist beyond a single context window are written to a structured store — a database of findings, discovered hosts, credentials, and other artifacts. The agent can query this store at any point to retrieve information from earlier in the session.
+
+<Note>
+  Long-term memory is scoped to a single assessment session by default. Findings are not shared across separate Cairn runs unless you explicitly configure a persistent datastore.
+</Note>
+
+## Agent autonomy
+
+Cairn is designed to operate without step-by-step human direction. Once you provide a goal and a target scope, the agent handles planning, tool selection, execution, and result interpretation on its own.
+
+<Steps>
+  <Step title="Receive goal">
+    You provide a high-level objective in natural language, such as "assess the attack surface of 192.168.1.0/24 and report any critical findings."
+  </Step>
+  <Step title="Decompose into sub-tasks">
+    The agent breaks the goal into a sequence of concrete, executable steps and builds a task graph with dependencies.
+  </Step>
+  <Step title="Execute iteratively">
+    Each sub-task is executed by invoking a tool. The result is observed, interpreted, and used to inform the next step.
+  </Step>
+  <Step title="Adapt and replan">
+    If a step fails or produces unexpected output, the agent revises its plan rather than stopping. It may retry with different parameters, switch tools, or escalate the finding.
+  </Step>
+  <Step title="Report findings">
+    When the goal is complete, the agent compiles a structured report of all findings, including the reasoning trace that led to each conclusion.
+  </Step>
+</Steps>
+
+## Limitations
+
+Autonomy comes with real constraints. Understanding them helps you use Cairn effectively and safely.
+
+<AccordionGroup>
+  <Accordion title="Hallucination risk">
+    LLMs can generate plausible-sounding but incorrect outputs — including fabricated tool arguments, misinterpreted results, or false conclusions. Cairn mitigates this by grounding decisions in real tool output, but it cannot eliminate hallucinations entirely. Critical findings should always be reviewed by a qualified analyst before acting on them.
+  </Accordion>
+  <Accordion title="Cost considerations">
+    Each reasoning step consumes LLM tokens. Long assessments with many sub-tasks can accumulate significant API costs. You can control this with per-session token budgets and by configuring the agent to use cheaper models for simpler sub-tasks.
+  </Accordion>
+  <Accordion title="Context window limits">
+    Very long assessments produce more observations than any context window can hold. Cairn's summarization heuristics reduce this problem, but information loss is possible. For large-scope engagements, breaking the assessment into smaller, focused sessions produces more reliable results.
+  </Accordion>
+  <Accordion title="When human oversight matters">
+    Fully autonomous operation is appropriate for well-scoped, low-stakes assessments. For engagements that involve sensitive targets, production systems, or legally constrained environments, Cairn should be run in guided mode — where the agent proposes each major action and a human approves it before execution.
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  Cairn's autonomy does not imply authorization. Always obtain written permission before running any automated assessment against a target. Running Cairn against systems you do not own or have explicit permission to test is illegal in most jurisdictions.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Task planning" icon="sitemap" href="/concepts/task-planning">
+    See how Cairn decomposes a high-level goal into a structured task graph.
+  </Card>
+  <Card title="Tool use" icon="wrench" href="/concepts/tool-use">
+    Learn how the agent selects, invokes, and chains external tools.
+  </Card>
+</CardGroup>

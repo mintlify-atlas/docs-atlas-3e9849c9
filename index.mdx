@@ -1,97 +1,61 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Cairn: autonomous AI penetration testing and automation"
+description: "Cairn autonomously plans and executes penetration tests and multi-step problem-solving tasks using LLM reasoning and dynamic tool use."
 ---
 
-## Setting up
+Cairn is an AI-driven automation system that autonomously plans, executes, and adapts complex security assessments and problem-solving tasks. Powered by large language models with dynamic tool use, Cairn demonstrated its capabilities by being the **sole team to achieve a full score (AK)** in the Tencent Cloud 2nd AI Penetration Challenge — placing 4th overall in the online competition.
 
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get Cairn running in minutes and execute your first automated task
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="How It Works" icon="brain" href="/how-it-works">
+    Understand how Cairn's AI agent plans and executes complex workflows
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Core Concepts" icon="lightbulb" href="/concepts/ai-agent">
+    Learn the foundational ideas behind Cairn's autonomous operation
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Guides" icon="map" href="/guides/running-a-scan">
+    Step-by-step guides for common Cairn workflows
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## What Cairn does
 
-Everything you need to create world-class documentation.
+Cairn combines a large language model reasoning engine with a dynamic tool-use framework to autonomously solve multi-step problems. In the security domain, this means Cairn can plan an attack surface, identify vulnerabilities, chain exploits, and report findings — all without manual intervention.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+<Steps>
+  <Step title="Install and configure">
+    Set up Cairn with your LLM provider credentials and target configuration. See the [installation guide](/installation) for details.
+  </Step>
+  <Step title="Define your task">
+    Describe the problem or assessment goal in natural language. Cairn's planner breaks it into executable sub-tasks automatically.
+  </Step>
+  <Step title="Run and monitor">
+    Cairn autonomously selects tools, executes steps, and adapts its strategy based on intermediate results.
+  </Step>
+  <Step title="Review results">
+    Collect structured findings with reasoning traces, tool outputs, and actionable recommendations.
+  </Step>
+</Steps>
 
-## Need inspiration?
+## Key capabilities
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<CardGroup cols={2}>
+  <Card title="Autonomous task planning" icon="sitemap" href="/concepts/task-planning">
+    LLM-powered decomposition of complex goals into executable action sequences
+  </Card>
+  <Card title="Dynamic tool use" icon="wrench" href="/concepts/tool-use">
+    Adaptive selection and chaining of security tools based on context
+  </Card>
+  <Card title="Penetration testing workflows" icon="shield-halved" href="/concepts/penetration-workflow">
+    End-to-end automated security assessment from reconnaissance to reporting
+  </Card>
+  <Card title="Extensible architecture" icon="puzzle-piece" href="/guides/custom-tools">
+    Add custom tools and adapt Cairn to your specific environment
+  </Card>
+</CardGroup>
+
+<Note>
+  Cairn is licensed under AGPL-3.0 for personal and educational use. For commercial use, contact the maintainers for a commercial license. See the [license page](/reference/license) for details.
+</Note>

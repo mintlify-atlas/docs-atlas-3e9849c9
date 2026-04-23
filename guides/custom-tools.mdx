@@ -1,0 +1,253 @@
+---
+title: "Extend Cairn by building and registering custom tools"
+description: "Write a Python tool class, register it in config.yaml, and let Cairn's LLM agent discover and invoke it autonomously during security assessments."
+---
+
+Cairn's tool-use framework lets you add any capability the built-in toolset does not cover. Custom tools are plain Python classes that follow a simple interface. Once registered, Cairn's LLM agent reads each tool's description and decides autonomously when to call it — so writing a clear, precise description is as important as writing correct code.
+
+## Tool interface
+
+Every Cairn tool implements four things:
+
+| Attribute | Type | Purpose |
+|-----------|------|---------|
+| `name` | `str` | Unique identifier used internally and in log output |
+| `description` | `str` | Natural-language explanation read by the LLM to decide when to call this tool |
+| `parameters` | `dict` | JSON Schema describing the tool's inputs |
+| `execute(params)` | `method` | Runs the tool and returns a result string or dict |
+
+The base class lives in `cairn.tools.base`:
+
+```python
+from cairn.tools.base import BaseTool
+
+class MyTool(BaseTool):
+    name = "my_tool"
+    description = "..."
+    parameters = {...}
+
+    def execute(self, params: dict) -> str:
+        ...
+```
+
+<Info>
+  Cairn passes `params` as a plain dict that already matches your declared `parameters` schema — type coercion and required-field validation happen before `execute` is called.
+</Info>
+
+## Example: a custom HTTP fuzzer tool
+
+This tool sends a list of common paths to a target URL and returns which ones returned a 200 response. It is a minimal but realistic example of a reconnaissance tool.
+
+```python
+import requests
+from cairn.tools.base import BaseTool
+
+
+class HttpPathFuzzer(BaseTool):
+    name = "http_path_fuzzer"
+
+    description = (
+        "Probe a web server for common hidden paths and endpoints by sending HTTP GET "
+        "requests. Returns a list of paths that responded with HTTP 200. Use this tool "
+        "when you have confirmed an HTTP service is running and want to enumerate "
+        "accessible resources before running deeper web application checks."
+    )
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "base_url": {
+                "type": "string",
+                "description": "Base URL to fuzz, e.g. http://192.168.1.10",
+            },
+            "wordlist": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "List of paths to probe. If omitted, a built-in common-paths "
+                    "list is used."
+                ),
+            },
+            "timeout": {
+                "type": "number",
+                "description": "Per-request timeout in seconds. Defaults to 5.",
+            },
+        },
+        "required": ["base_url"],
+    }
+
+    DEFAULT_PATHS = [
+        "/admin", "/login", "/dashboard", "/api", "/api/v1",
+        "/.env", "/config", "/backup", "/robots.txt", "/sitemap.xml",
+        "/phpinfo.php", "/wp-admin", "/wp-login.php",
+    ]
+
+    def execute(self, params: dict) -> dict:
+        base_url = params["base_url"].rstrip("/")
+        paths = params.get("wordlist", self.DEFAULT_PATHS)
+        timeout = params.get("timeout", 5)
+
+        hits = []
+        errors = []
+
+        for path in paths:
+            url = f"{base_url}{path}"
+            try:
+                resp = requests.get(url, timeout=timeout, allow_redirects=False)
+                if resp.status_code == 200:
+                    hits.append({"path": path, "status": 200, "size": len(resp.content)})
+            except requests.RequestException as exc:
+                errors.append({"path": path, "error": str(exc)})
+
+        return {
+            "base_url": base_url,
+            "probed": len(paths),
+            "hits": hits,
+            "errors": errors,
+        }
+```
+
+## Registering a custom tool
+
+Save your tool file anywhere in your project, then register it in `cairn.config.yaml` (or in the Python entrypoint if you are running Cairn programmatically).
+
+<CodeGroup>
+
+```yaml cairn.config.yaml
+tools:
+  custom:
+    - path: tools/http_path_fuzzer.py
+      class: HttpPathFuzzer
+    - path: tools/my_other_tool.py
+      class: MyOtherTool
+```
+
+```python Programmatic registration
+from cairn import Cairn
+from tools.http_path_fuzzer import HttpPathFuzzer
+
+agent = Cairn(config="cairn.config.yaml")
+agent.register_tool(HttpPathFuzzer())
+agent.run(task="...", target="...")
+```
+
+</CodeGroup>
+
+Cairn loads tools at startup, validates their schemas, and makes them available to the agent's planning loop. You will see the tool name in the startup summary:
+
+```text
+[cairn] Tools loaded: nmap_scan, service_fingerprint, http_probe, http_path_fuzzer
+```
+
+## Writing effective tool descriptions
+
+The LLM agent reads your `description` field verbatim to decide:
+
+1. Whether this tool is relevant to the current sub-task.
+2. When to prefer it over other available tools.
+3. What values to pass for each parameter.
+
+<AccordionGroup>
+  <Accordion title="Be explicit about preconditions">
+    Tell the agent what must be true before calling your tool. This prevents it from calling your fuzzer before confirming an HTTP service is present.
+
+    ```python
+    # Weak — the agent may call this on any host
+    description = "Fuzz web paths on a target."
+
+    # Better — the agent only calls this after HTTP is confirmed
+    description = (
+        "Probe a web server for hidden paths. Use this tool only after confirming "
+        "an HTTP or HTTPS service is running on the target."
+    )
+    ```
+  </Accordion>
+  <Accordion title="Describe the output, not just the input">
+    Explain what the tool returns so the agent knows how to use the result in subsequent reasoning.
+
+    ```python
+    description = (
+        "Returns a list of URL paths that responded with HTTP 200. The agent can use "
+        "these paths to prioritize deeper inspection of exposed endpoints."
+    )
+    ```
+  </Accordion>
+  <Accordion title="Distinguish it from similar tools">
+    If Cairn has other HTTP tools, tell the agent what makes yours different.
+
+    ```python
+    description = (
+        "Unlike http_probe, which checks a single URL, this tool systematically "
+        "tests a list of common paths and returns all successful hits in one call."
+    )
+    ```
+  </Accordion>
+  <Accordion title="Keep it under 100 words">
+    Long descriptions can confuse the model or dilute the key signal. Aim for 40–80 words that cover: what it does, when to use it, and what it returns.
+  </Accordion>
+</AccordionGroup>
+
+## Testing a custom tool in isolation
+
+Before registering a tool with Cairn, test it directly to confirm it works and returns the expected structure.
+
+```python
+# test_http_path_fuzzer.py
+from tools.http_path_fuzzer import HttpPathFuzzer
+
+tool = HttpPathFuzzer()
+
+# Smoke test against a known target (use a host you control)
+result = tool.execute({
+    "base_url": "http://localhost:8080",
+    "wordlist": ["/admin", "/login", "/api"],
+    "timeout": 3,
+})
+
+print(result)
+# Expected:
+# {
+#   "base_url": "http://localhost:8080",
+#   "probed": 3,
+#   "hits": [{"path": "/admin", "status": 200, "size": 4821}],
+#   "errors": []
+# }
+
+assert isinstance(result["hits"], list)
+assert isinstance(result["errors"], list)
+print("Tool test passed.")
+```
+
+Run it with:
+
+```bash
+python test_http_path_fuzzer.py
+```
+
+<Tip>
+  Test your tool against a local server like a Docker container running a known-vulnerable application (e.g., DVWA or Juice Shop) before using it in a real engagement.
+</Tip>
+
+## Sharing tools with the community
+
+If your tool is general enough to be useful to others:
+
+1. Fork the [Cairn repository](https://github.com/oritera/Cairn) on GitHub.
+2. Add your tool file to the `tools/community/` directory.
+3. Add an entry to `tools/community/README.md` with a brief description, required dependencies, and an example.
+4. Open a pull request against the `main` branch.
+
+<Note>
+  Community tools are reviewed for safety before being merged. Tools that automate destructive or irreversible actions (e.g., data deletion, ransomware simulation) will not be accepted.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Running a scan" icon="radar" href="/guides/running-a-scan">
+    Use your new tool in a live scan
+  </Card>
+  <Card title="Tool use concepts" icon="wrench" href="/concepts/tool-use">
+    Understand how Cairn selects and chains tools during a task
+  </Card>
+</CardGroup>

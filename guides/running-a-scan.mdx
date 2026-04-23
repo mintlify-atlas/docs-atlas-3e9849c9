@@ -1,0 +1,208 @@
+---
+title: "Run an autonomous Cairn security scan step by step"
+description: "Step-by-step guide to defining a target, writing a task description, launching a scan, monitoring live output, and stopping safely."
+---
+
+Cairn executes security scans autonomously once you give it a target and a task description. This guide walks through the full workflow — from specifying your scope to reviewing live output and safely stopping a run when needed.
+
+<Note>
+  Always ensure you have written authorization to scan the target system. Cairn is a powerful tool; unauthorized use against systems you do not own is illegal.
+</Note>
+
+## Prerequisites
+
+- Cairn installed and configured with a valid LLM provider key. See the [installation guide](/installation).
+- Network access to the target from the machine running Cairn.
+- Python 3.10 or later in your environment.
+
+## The scan workflow
+
+<Steps>
+  <Step title="Define your target">
+    Cairn accepts three target formats on the command line:
+
+    | Format | Example | Description |
+    |--------|---------|-------------|
+    | Single IP | `192.168.1.10` | Scan one host |
+    | Domain | `example.internal` | Resolve and scan the domain |
+    | CIDR range | `192.168.1.0/24` | Scan the entire subnet |
+
+    Pick the format that matches your authorized scope. For broad engagements, start with a CIDR range to let Cairn enumerate live hosts before probing services.
+
+    <Tip>
+      Narrow your scope as much as possible for your first scan. A single host or a small `/28` subnet is easier to review and faster to complete.
+    </Tip>
+  </Step>
+
+  <Step title="Write your task description">
+    The `--task` argument is a natural-language description of your goal. Cairn's planning engine reads this and breaks it into sub-tasks automatically.
+
+    Good task descriptions are specific about the goal but do not over-specify the method — let Cairn decide which tools to chain together.
+
+    <CodeGroup>
+
+    ```bash Minimal task
+    python cairn.py \
+      --task "Perform a full reconnaissance and identify open services" \
+      --target "192.168.1.10"
+    ```
+
+    ```bash Focused vulnerability task
+    python cairn.py \
+      --task "Enumerate web services on port 80 and 443 and check for common misconfigurations" \
+      --target "10.0.0.0/24"
+    ```
+
+    ```bash Domain-based task
+    python cairn.py \
+      --task "Map the attack surface of the target domain including subdomains and exposed APIs" \
+      --target "corp.example.internal"
+    ```
+
+    </CodeGroup>
+  </Step>
+
+  <Step title="Start the scan">
+    Run the command. Cairn prints a startup summary showing the parsed target, task plan, and the tools it has loaded.
+
+    ```bash
+    python cairn.py \
+      --task "Perform a full network reconnaissance and identify exploitable services" \
+      --target "192.168.1.0/24"
+    ```
+
+    Example startup output:
+
+    ```text
+    [cairn] Task received: "Perform a full network reconnaissance and identify exploitable services"
+    [cairn] Target: 192.168.1.0/24 (CIDR — 256 addresses)
+    [cairn] Tools loaded: nmap_scan, service_fingerprint, vuln_check, http_probe, ssh_bruteforce (disabled)
+    [cairn] Planning subtasks...
+    [cairn] Plan:
+      1. Host discovery (ping sweep)
+      2. Port scan on live hosts
+      3. Service fingerprinting
+      4. Vulnerability lookup per service
+      5. Generate findings report
+    [cairn] Starting execution...
+    ```
+  </Step>
+
+  <Step title="Monitor progress">
+    Cairn emits structured log lines as it works. Each line identifies the current sub-task, the tool being called, and the outcome.
+
+    ```text
+    [step 1/5] host_discovery — nmap_scan("-sn 192.168.1.0/24")
+    [step 1/5] host_discovery — found 14 live hosts
+    [step 2/5] port_scan — nmap_scan("-sV -p- 192.168.1.5")
+    [step 2/5] port_scan — 192.168.1.5: 22/tcp open ssh, 80/tcp open http, 3306/tcp open mysql
+    [step 3/5] service_fingerprint — http_probe("http://192.168.1.5")
+    [step 3/5] service_fingerprint — Apache 2.4.51, PHP 7.4.3
+    [step 4/5] vuln_check — CVE-2021-41773 matched (Apache 2.4.49/2.4.50 path traversal — version mismatch, skipped)
+    [step 4/5] vuln_check — PHP 7.4.3 EOL — flagged as informational finding
+    ...
+    ```
+
+    To write logs to a file for later review, redirect output:
+
+    ```bash
+    python cairn.py \
+      --task "Enumerate services and check for known vulnerabilities" \
+      --target "192.168.1.0/24" \
+      2>&1 | tee cairn-$(date +%Y%m%d-%H%M%S).log
+    ```
+  </Step>
+
+  <Step title="Understand intermediate output">
+    During a run, Cairn emits three types of lines:
+
+    | Prefix | Meaning |
+    |--------|---------|
+    | `[step N/M]` | A planned sub-task is executing |
+    | `[tool]` | A tool call was made and returned a result |
+    | `[reasoning]` | The LLM evaluated results and updated the plan |
+
+    The `[reasoning]` lines are especially useful. They show you when Cairn is adapting — for example, abandoning a path because a port is filtered, or escalating to a deeper probe because an open service returned an unusual banner.
+
+    ```text
+    [reasoning] Port 3306 on 192.168.1.7 is open but bind-address=127.0.0.1 — external access blocked. Skipping MySQL checks for this host.
+    [reasoning] 192.168.1.12 returned a 200 on /admin/ with no authentication challenge — adding targeted web enumeration sub-task.
+    ```
+  </Step>
+
+  <Step title="Decide when to intervene">
+    Cairn is designed to run without supervision, but there are situations where manual intervention improves the outcome.
+
+    <AccordionGroup>
+      <Accordion title="Let it run autonomously when...">
+        - The task is broad reconnaissance or service enumeration.
+        - Cairn is following expected paths (port scan → fingerprint → vuln check).
+        - Log output shows steady forward progress through planned sub-tasks.
+        - You have authorized a wide scope and have time to review results afterward.
+      </Accordion>
+      <Accordion title="Consider intervening when...">
+        - Cairn is repeatedly retrying the same tool call with similar parameters.
+        - A `[reasoning]` line shows it is considering an action outside your authorized scope.
+        - The run has stalled on a sub-task for more than a few minutes with no new log output.
+        - You see a tool being called that you did not expect (e.g., an exploit module on a production host).
+      </Accordion>
+    </AccordionGroup>
+
+    To pause output without stopping the process, use the terminal's scroll-lock (`Ctrl+S` / `Ctrl+Q`). To kill the process, see the next step.
+  </Step>
+
+  <Step title="Stop a scan safely">
+    Send a single `Ctrl+C` to initiate a graceful shutdown. Cairn catches the signal, finishes the current tool call, writes a partial results file, and exits cleanly.
+
+    ```text
+    ^C
+    [cairn] Interrupt received — finishing current tool call...
+    [cairn] Partial results written to cairn-results-20260423-142301.json
+    [cairn] Exiting.
+    ```
+
+    <Warning>
+      Sending `Ctrl+C` twice (or using `kill -9`) will terminate Cairn immediately. Any in-progress tool calls will not complete, and partial results may not be saved.
+    </Warning>
+
+    If you need to stop immediately regardless:
+
+    ```bash
+    # Find the PID
+    pgrep -f cairn.py
+
+    # Terminate gracefully
+    kill -SIGTERM <pid>
+
+    # Force kill only if SIGTERM is unresponsive
+    kill -9 <pid>
+    ```
+  </Step>
+</Steps>
+
+## Common flags
+
+| Flag | Description |
+|------|-------------|
+| `--task "..."` | Natural-language description of the goal (required) |
+| `--target "..."` | IP, domain, or CIDR range (required) |
+| `--output <path>` | Override the default results file path |
+| `--tools <list>` | Comma-separated list of tools to enable (default: all) |
+| `--no-exploit` | Disable all exploit-class tools; run in passive/reconnaissance mode |
+| `--verbose` | Emit full tool call inputs and outputs in the log |
+| `--config <path>` | Load a custom configuration file |
+
+<Tip>
+  Use `--no-exploit` for initial reconnaissance on production targets. This limits Cairn to information-gathering tools and avoids any active exploitation attempts.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Interpreting results" icon="chart-bar" href="/guides/interpreting-results">
+    Understand findings, confidence scores, and how to act on Cairn's output
+  </Card>
+  <Card title="Custom tools" icon="wrench" href="/guides/custom-tools">
+    Extend Cairn with your own tools to cover specialized scenarios
+  </Card>
+</CardGroup>

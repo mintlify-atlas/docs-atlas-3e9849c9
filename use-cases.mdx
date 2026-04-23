@@ -1,0 +1,119 @@
+---
+title: "Cairn Use Cases: Security Testing and AI Automation"
+description: "Cairn automates CTF challenges, web app pentests, network recon, and vulnerability chaining — plus general multi-step AI automation beyond security."
+---
+
+Cairn's autonomous agent architecture applies wherever a goal requires sequential reasoning, tool use, and adaptation. Its primary domain is security — but the same loop that drives a penetration test can drive any sufficiently complex multi-step problem. This page describes the most common use cases and what Cairn does in each.
+
+## Security use cases
+
+### CTF (Capture the Flag) competition automation
+
+Cairn demonstrated its capabilities in adversarial CTF-style competition, achieving a perfect score (AK) as the sole team in the Tencent Cloud 2nd AI Penetration Challenge. In CTF contexts, Cairn:
+
+- Reasons about challenge category and structure from the problem description
+- Selects appropriate tools (binary analysis, web exploitation, cryptography utilities)
+- Chains multiple exploitation steps toward the flag
+- Adapts when initial approaches fail or yield partial results
+
+<Tip>
+  CTF challenges are well-suited for Cairn because they have clear objectives and measurable outcomes, making it straightforward to evaluate whether the agent's approach is working.
+</Tip>
+
+### Web application penetration testing
+
+Cairn can conduct end-to-end web application assessments autonomously:
+
+<Steps>
+  <Step title="Reconnaissance">
+    Cairn enumerates the application — crawling endpoints, identifying frameworks, server versions, and exposed parameters — to build an attack surface map.
+  </Step>
+  <Step title="Vulnerability identification">
+    Using the attack surface map, Cairn systematically tests for common vulnerability classes: injection flaws, authentication bypasses, access control issues, and misconfigurations.
+  </Step>
+  <Step title="Exploitation">
+    For confirmed vulnerabilities, Cairn attempts controlled exploitation to validate severity and gather evidence for reporting.
+  </Step>
+  <Step title="Reporting">
+    Cairn produces structured findings with severity ratings, tool outputs, reasoning traces, and remediation context.
+  </Step>
+</Steps>
+
+### Network reconnaissance and scanning
+
+Cairn can drive multi-stage network reconnaissance without manual handoff between tools:
+
+<CardGroup cols={2}>
+  <Card title="Port and service enumeration" icon="network-wired">
+    Scan target hosts, identify open ports, fingerprint services, and surface unexpected exposures
+  </Card>
+  <Card title="Asset discovery" icon="magnifying-glass">
+    Enumerate subdomains, related infrastructure, and network topology from initial targets
+  </Card>
+  <Card title="Service-specific probing" icon="magnifying-glass-plus">
+    Invoke targeted tools against identified services — version detection, default credential checks, known CVE scanning
+  </Card>
+  <Card title="Findings aggregation" icon="layer-group">
+    Consolidate outputs across tools into a coherent picture of the network's exposure
+  </Card>
+</CardGroup>
+
+### Vulnerability discovery and exploitation chaining
+
+One of Cairn's core strengths is chaining: using the output of one phase as input to the next without human intervention.
+
+```text
+Example chain:
+  Port scan → identifies HTTP service on non-standard port
+  → Web crawler → discovers admin panel at /manage
+  → Directory brute-force → finds exposed backup file
+  → Credential extraction → recovers database password
+  → Database access → confirms data exposure
+```
+
+Cairn reasons about these connections and constructs the chain dynamically based on what each step reveals.
+
+<Warning>
+  Use Cairn only against systems you are authorized to test. Unauthorized penetration testing is illegal. Cairn's capabilities are intended for legitimate security research, red team engagements, and educational use.
+</Warning>
+
+## General automation use cases
+
+### Multi-step AI problem-solving
+
+Cairn's agent architecture is not specific to security. Any problem that can be expressed as a goal with observable intermediate states and available tools is a candidate for Cairn:
+
+<AccordionGroup>
+  <Accordion title="Data collection and enrichment pipelines" icon="database">
+    Cairn can orchestrate multi-source data collection: querying APIs, scraping structured sources, cross-referencing results, and producing a consolidated output — adapting when individual sources are unavailable or return unexpected formats.
+  </Accordion>
+  <Accordion title="Automated investigation workflows" icon="search">
+    Given an entity or event to investigate, Cairn can systematically query relevant sources, reason about what each result implies, and pursue follow-on queries until the investigation reaches a conclusion.
+  </Accordion>
+  <Accordion title="Infrastructure automation" icon="server">
+    Complex multi-step infrastructure tasks — provisioning, configuration validation, dependency checking — can be described as goals and executed by Cairn's planner, with replanning when individual steps fail.
+  </Accordion>
+</AccordionGroup>
+
+### Research and education
+
+Cairn is well-suited for environments where understanding the agent's reasoning matters as much as the outcome:
+
+- **Security education**: Demonstrate penetration testing methodology with full reasoning traces, making the decision-making process visible and instructive
+- **Agent research**: Study how an LLM-driven agent performs on real-world multi-step tasks, where success and failure are objectively measurable
+- **Red team research**: Investigate the capabilities and limits of AI-driven offensive security automation in controlled environments
+
+<Note>
+  Cairn's reasoning traces record every decision point — which tool was chosen, why a plan was revised, how intermediate results were interpreted. This transparency makes Cairn a useful tool for studying autonomous agent behavior.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="How it works" icon="gears" href="/how-it-works">
+    Understand the agent loop and architecture behind these use cases
+  </Card>
+  <Card title="Running a scan" icon="play" href="/guides/running-a-scan">
+    Follow a practical guide to executing your first Cairn assessment
+  </Card>
+</CardGroup>

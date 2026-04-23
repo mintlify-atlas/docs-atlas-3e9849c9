@@ -1,0 +1,119 @@
+---
+title: "Cairn architecture: components, data flow, and design"
+description: "Cairn's five core components — LLM core, task planner, tool registry, executor, and reporter — and how they interact to execute autonomous assessments."
+---
+
+Cairn is composed of five tightly integrated components that work together to turn a natural-language goal into an autonomous, tool-driven execution loop and a structured final report. Each component has a single, well-defined responsibility, and the system is designed so that any layer — LLM provider, tool set, or output format — can be swapped or extended without touching the others.
+
+## Core components
+
+<CardGroup cols={2}>
+  <Card title="LLM core" icon="brain">
+    The reasoning engine. Receives context, generates plans, interprets tool results, and decides what to do next. Abstracted behind a provider interface so any supported model can be used.
+  </Card>
+  <Card title="Task planner" icon="sitemap">
+    Decomposes the user's top-level goal into an ordered list of sub-tasks. Re-plans dynamically when execution reveals unexpected results or dead ends.
+  </Card>
+  <Card title="Tool registry" icon="toolbox">
+    Discovers, validates, and exposes all available tools to the LLM. Tools register their schema at load time so the model always knows what inputs each tool accepts.
+  </Card>
+  <Card title="Executor" icon="play">
+    Calls tools on behalf of the LLM, enforces per-tool timeouts and sandboxing, captures stdout/stderr, and returns structured results back into the reasoning loop.
+  </Card>
+  <Card title="Reporter" icon="file-lines">
+    Collects findings, reasoning traces, and tool outputs across all iterations and serializes them to the configured output format (JSON, Markdown, or HTML).
+  </Card>
+  <Card title="Persistence layer" icon="database">
+    Stores run state — completed sub-tasks, partial findings, and tool call history — so a run can be resumed after interruption and so findings are not lost mid-session.
+  </Card>
+</CardGroup>
+
+## Component interactions
+
+The components form a directed cycle that terminates when the planner determines the goal has been met or the maximum iteration count is reached.
+
+| Step | From | To | What happens |
+|------|------|----|--------------|
+| 1 | User | Task planner | User provides a natural-language goal and target configuration |
+| 2 | Task planner | LLM core | Goal is formatted into a prompt and sent for initial decomposition |
+| 3 | LLM core | Tool registry | LLM requests the tool manifest to understand available capabilities |
+| 4 | LLM core | Executor | LLM emits a tool call; executor dispatches it |
+| 5 | Executor | Tool | Tool runs inside optional sandbox; output is captured |
+| 6 | Executor | LLM core | Raw tool output is fed back as context for the next reasoning step |
+| 7 | LLM core | Task planner | LLM signals task completion or requests re-planning |
+| 8 | Task planner | Reporter | Completed findings are flushed to the reporter |
+| 9 | Reporter | Persistence layer | Reporter writes output and updates run state on disk |
+
+Steps 3–7 repeat for each sub-task in the plan.
+
+## Data flow: from input to report
+
+<Steps>
+  <Step title="User submits a goal">
+    The user provides a target description and an objective (for example, "assess the attack surface of 192.168.1.10"). Configuration is loaded from the YAML config file, including LLM provider credentials and tool settings.
+  </Step>
+  <Step title="Task planner decomposes the goal">
+    The planner sends the goal to the LLM core together with any prior context. The LLM returns an ordered list of sub-tasks (for example: port scan → service fingerprint → vulnerability check → exploitation attempt → report).
+  </Step>
+  <Step title="Execution loop begins">
+    For each sub-task, the LLM selects a tool from the registry, specifies arguments, and emits a structured tool-call request. The executor dispatches the call, enforces the configured timeout, and streams results back.
+  </Step>
+  <Step title="Adaptive re-planning">
+    After each tool call, the LLM evaluates the output. If results are unexpected — for example, a port is closed that was expected to be open — the planner inserts or removes downstream sub-tasks before continuing.
+  </Step>
+  <Step title="Findings accumulate in the persistence layer">
+    Every completed sub-task writes its finding to the persistence layer immediately, so progress is not lost if the run is interrupted.
+  </Step>
+  <Step title="Reporter generates output">
+    When the plan is exhausted or the goal is marked complete, the reporter aggregates all findings into a structured document in the configured format and writes it to the output directory.
+  </Step>
+</Steps>
+
+## LLM provider abstraction layer
+
+Cairn does not depend on any single LLM provider. A thin provider interface standardizes how prompts are sent and how responses are parsed. Adding a new provider requires only implementing this interface — no changes to the planner, executor, or reporter are needed.
+
+<CardGroup cols={2}>
+  <Card title="OpenAI" icon="o" href="/reference/configuration-options">
+    GPT-4o and other OpenAI models via the standard API. Configure with `llm.provider: openai`.
+  </Card>
+  <Card title="Anthropic" icon="a" href="/reference/configuration-options">
+    Claude 3.5 Sonnet and other Anthropic models. Configure with `llm.provider: anthropic`.
+  </Card>
+  <Card title="Ollama" icon="server" href="/reference/configuration-options">
+    Locally hosted open-source models via Ollama. Supports fully offline operation.
+  </Card>
+  <Card title="Custom endpoints" icon="plug" href="/reference/configuration-options">
+    Any OpenAI-compatible API via `llm.base_url`. Useful for proxies and self-hosted deployments.
+  </Card>
+</CardGroup>
+
+## Tool registry: discovery and loading
+
+Tools are the means by which the LLM interacts with the real world — running scanners, sending requests, reading files, and more. The tool registry is responsible for making all tools available to the LLM in a consistent, queryable format.
+
+At startup the registry:
+
+1. Scans configured tool directories for tool definitions.
+2. Validates each tool's schema (name, description, input parameters, output structure).
+3. Registers valid tools and builds a manifest — a machine-readable description of every available tool and its accepted inputs.
+4. Serves the manifest to the LLM core on demand so the model can choose the right tool for each sub-task.
+
+Tools that fail schema validation are skipped and logged as warnings rather than causing a startup failure. This allows a partially configured environment to still be useful.
+
+<Note>
+  The `tools.enabled` configuration key lets you restrict which tools are loaded. If left unset, all discovered tools are registered. See [configuration options](/reference/configuration-options) for details.
+</Note>
+
+## Persistence layer: state across runs
+
+The persistence layer stores all run state to disk in the output directory configured by `output.dir`. This serves two purposes:
+
+- **Resumability** — if a run is interrupted (for example, by a network failure or timeout), it can be restarted from the last saved checkpoint rather than from the beginning.
+- **Auditability** — the full history of tool calls, intermediate results, and reasoning steps is available for review after a run completes.
+
+State is written after each sub-task completes, so the maximum data loss on an unexpected interruption is one sub-task's worth of work.
+
+<Tip>
+  If you are running Cairn repeatedly against the same target, check the persistence layer output between runs. Prior findings are available as context and can reduce redundant tool calls.
+</Tip>

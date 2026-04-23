@@ -1,0 +1,79 @@
+---
+title: "Introduction to Cairn: AI-driven security automation"
+description: "Cairn is an AI automation framework for autonomous security testing and problem-solving — the sole team to AK the Tencent Cloud AI Hacking Challenge."
+---
+
+Cairn is an AI-driven automation system that autonomously plans, executes, and adapts complex security assessments and general problem-solving tasks. Built on a large language model reasoning core with dynamic tool use, Cairn removes the manual, repetitive burden from security testing — enabling professionals to operate at a higher level of abstraction while the system handles execution.
+
+## Competition background
+
+Cairn was developed and validated through high-stakes competitive testing. At the **Tencent Cloud 2nd AI Penetration Challenge (TCH Hackathon)**, the Bytex@起零衍迹实验室 team achieved a perfect score — the only team to **AK (full score)** the competition — and placed **4th overall** in the online rankings.
+
+<Note>
+  The source code is currently being prepared for public release. Follow the [GitHub repository](https://github.com/oritera/Cairn) to be notified when it becomes available.
+</Note>
+
+## What Cairn is
+
+Cairn is not a scripted scanner or a fixed-workflow tool. It is an autonomous agent that reasons about a goal, decomposes it into steps, selects appropriate tools, executes those steps, and replans when something goes wrong — all within a single continuous loop driven by a large language model.
+
+This architecture makes Cairn applicable to any multi-step problem where reasoning, adaptation, and tool use are required, with security testing as its primary domain.
+
+## Key value proposition
+
+<CardGroup cols={2}>
+  <Card title="Autonomous operation" icon="robot">
+    Cairn replaces manual, repetitive steps in security assessments with an LLM agent that plans and executes end-to-end
+  </Card>
+  <Card title="Adaptive replanning" icon="arrows-rotate">
+    When a step fails or yields unexpected results, Cairn revises its plan rather than stopping or producing a false negative
+  </Card>
+  <Card title="Tool chaining" icon="link">
+    Cairn dynamically selects and chains security and general-purpose tools based on context and intermediate findings
+  </Card>
+  <Card title="Proven in competition" icon="trophy">
+    Validated against real adversarial challenges — the only system to achieve a perfect score in the Tencent Cloud AI Hacking Challenge
+  </Card>
+</CardGroup>
+
+## Who Cairn is for
+
+Cairn is designed for practitioners who need reliable, repeatable automation across complex multi-step workflows.
+
+<AccordionGroup>
+  <Accordion title="Security researchers and red teamers" icon="shield-halved">
+    Cairn automates reconnaissance, vulnerability discovery, and exploitation chaining for penetration testing engagements. It can carry out assessments that would otherwise require significant manual effort, while preserving full reasoning traces for audit and reporting.
+  </Accordion>
+  <Accordion title="CTF players" icon="flag">
+    Cairn can autonomously work through Capture the Flag challenges by reasoning about challenge structure, selecting the right tools, and chaining exploitation steps — making it effective for both practice and competition.
+  </Accordion>
+  <Accordion title="AI and ML practitioners" icon="brain">
+    Cairn's architecture illustrates practical autonomous agent design: how a task-planning loop, tool-use layer, and LLM reasoning core combine to solve real-world problems. Researchers exploring agentic AI systems will find Cairn a concrete reference implementation.
+  </Accordion>
+  <Accordion title="Security educators" icon="graduation-cap">
+    Cairn provides a reproducible, observable environment for demonstrating penetration testing concepts. Its reasoning traces make the decision-making process transparent and instructive.
+  </Accordion>
+</AccordionGroup>
+
+## Licensing
+
+Cairn is licensed under **GNU AGPL-3.0** for personal and educational use. This means:
+
+- You can use, study, and modify Cairn for non-commercial purposes.
+- If you distribute modified versions or run Cairn as a service, you must publish your source changes under the same license.
+- For commercial or proprietary deployments without AGPL-3.0 obligations, a commercial license is available — contact the maintainers directly.
+
+<Tip>
+  Contributions via pull request are welcome. By submitting a PR, you agree that your contributions may be included under both the AGPL-3.0 license and the project's commercial license.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="How it works" icon="gears" href="/how-it-works">
+    Understand Cairn's agent loop and architecture
+  </Card>
+  <Card title="Use cases" icon="list-check" href="/use-cases">
+    Explore what Cairn can do across security and general automation
+  </Card>
+</CardGroup>

@@ -1,28 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "Cairn",
+  "projectType": "ai-ml",
+  "projectName": "Cairn",
+  "projectDescription": "An AI-driven automation system for general problem-solving and penetration testing, capable of autonomously executing complex security assessments.",
   "theme": "aspen",
-  "colors": {
-    "primary": "#1dc725",
-    "light": "#8ce494",
-    "dark": "#ffffff"
-  },
-  "favicon": "https://media.brand.dev/eb6712ee-5424-4791-9e17-efc14f45ddf7.png",
-  "logo": {
-    "light": "https://media.brand.dev/ade08562-fd76-4bf6-89ce-f43042676d83.svg",
-    "dark": "https://media.brand.dev/ade08562-fd76-4bf6-89ce-f43042676d83.svg"
-  },
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/oritera/Cairn"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/oritera/Cairn"
-    }
-  },
+  "primaryColor": "#1dc725",
+  "lightColor": "#8ce494",
+  "darkColor": "#ffffff",
   "navigation": {
     "tabs": [
       {
@@ -73,5 +56,20 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "AI-driven autonomous penetration testing and problem solving",
+    "Automated task planning and multi-step execution",
+    "Dynamic tool selection and chaining for security assessments",
+    "Competition-proven: sole team to achieve full score (AK) in Tencent Cloud AI Penetration Challenge",
+    "General-purpose AI automation applicable beyond security contexts",
+    "AGPL-3.0 licensed with optional commercial licensing"
+  ],
+  "publicApiSurface": [
+    "AI agent entrypoint for task automation",
+    "Penetration testing workflow orchestrator",
+    "Tool-use interface for extensible security tooling",
+    "Task planning and reasoning engine",
+    "Results reporting and output generation"
+  ]
 }

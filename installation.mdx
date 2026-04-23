@@ -1,0 +1,211 @@
+---
+title: "Install Cairn: Python setup and optional pentest tools"
+description: "Step-by-step instructions to install Cairn, configure a Python virtual environment, and set up optional external tools for full capability."
+---
+
+This page covers everything you need to install Cairn on your machine, from verifying system requirements through to confirming that Cairn is ready to run. For a faster path to your first task, see the [quickstart guide](/quickstart).
+
+## System requirements
+
+Cairn runs on any modern Linux, macOS, or Windows system that meets the following requirements.
+
+<CardGroup cols={2}>
+  <Card title="Operating system" icon="desktop">
+    Linux (Ubuntu 20.04+, Debian 11+, Kali), macOS 12+, or Windows 10/11 with WSL2
+  </Card>
+  <Card title="Python" icon="python">
+    Python 3.10 or later. Python 3.12 is recommended for best performance.
+  </Card>
+  <Card title="Memory" icon="memory">
+    Minimum 4 GB RAM. 8 GB or more recommended for tasks involving multiple concurrent tools.
+  </Card>
+  <Card title="Disk space" icon="hard-drive">
+    At least 1 GB free for Cairn and its dependencies. Additional space required for tool output and logs.
+  </Card>
+</CardGroup>
+
+<Info>
+  Cairn is developed and tested primarily on Linux. macOS is fully supported. Windows users should use WSL2 for the best experience.
+</Info>
+
+## Installation steps
+
+<Steps>
+  <Step title="Verify Python version">
+    Check that Python 3.10 or later is installed and available on your `PATH`.
+
+    ```bash
+    python --version
+    # Python 3.12.3
+    ```
+
+    If Python is not installed or is an older version, download it from [python.org](https://www.python.org/downloads/) or use your system package manager:
+
+    <CodeGroup>
+
+    ```bash Ubuntu / Debian
+    sudo apt update && sudo apt install python3.12 python3.12-venv python3-pip
+    ```
+
+    ```bash macOS (Homebrew)
+    brew install python@3.12
+    ```
+
+    ```bash Windows (winget)
+    winget install Python.Python.3.12
+    ```
+
+    </CodeGroup>
+  </Step>
+
+  <Step title="Clone the repository">
+    Clone Cairn from GitHub to a directory of your choice.
+
+    ```bash
+    git clone https://github.com/oritera/Cairn.git
+    cd Cairn
+    ```
+
+    <Note>
+      The Cairn codebase is being prepared for public release. If the repository is not yet available, watch the [GitHub page](https://github.com/oritera/Cairn) for an announcement.
+    </Note>
+  </Step>
+
+  <Step title="Create a virtual environment">
+    Create an isolated Python environment to avoid conflicts with system packages.
+
+    ```bash
+    python -m venv .venv
+    ```
+
+    Activate the environment before installing or running anything:
+
+    <CodeGroup>
+
+    ```bash Linux / macOS
+    source .venv/bin/activate
+    ```
+
+    ```bash Windows (PowerShell)
+    .venv\Scripts\Activate.ps1
+    ```
+
+    ```bash Windows (cmd)
+    .venv\Scripts\activate.bat
+    ```
+
+    </CodeGroup>
+
+    Your prompt will show `(.venv)` when the environment is active.
+  </Step>
+
+  <Step title="Install Python dependencies">
+    Install all required packages from the project's requirements file.
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+    This installs Cairn's core dependencies:
+
+    - LLM provider client libraries (OpenAI, Anthropic)
+    - Task planning and agent orchestration modules
+    - Tool execution and output formatting libraries
+    - Logging and configuration management packages
+
+    <Tip>
+      If you see build errors for packages with native extensions, install the system build tools first: `sudo apt install build-essential` (Linux) or `xcode-select --install` (macOS).
+    </Tip>
+  </Step>
+
+  <Step title="Install optional external tools">
+    Cairn integrates with standard penetration testing tools. These are optional — Cairn will use whichever tools it can detect on your `PATH`.
+
+    <AccordionGroup>
+      <Accordion title="nmap — network scanning">
+        ```bash
+        # Ubuntu / Debian
+        sudo apt install nmap
+
+        # macOS
+        brew install nmap
+        ```
+      </Accordion>
+      <Accordion title="ffuf — web fuzzing">
+        ```bash
+        # Ubuntu / Debian (via Go)
+        go install github.com/ffuf/ffuf/v2@latest
+
+        # macOS
+        brew install ffuf
+        ```
+      </Accordion>
+      <Accordion title="sqlmap — SQL injection testing">
+        ```bash
+        # Ubuntu / Debian
+        sudo apt install sqlmap
+
+        # macOS
+        brew install sqlmap
+        ```
+      </Accordion>
+      <Accordion title="gobuster — directory and DNS brute-forcing">
+        ```bash
+        # Ubuntu / Debian
+        sudo apt install gobuster
+
+        # macOS
+        brew install gobuster
+        ```
+      </Accordion>
+      <Accordion title="nikto — web server scanning">
+        ```bash
+        # Ubuntu / Debian
+        sudo apt install nikto
+
+        # macOS
+        brew install nikto
+        ```
+      </Accordion>
+    </AccordionGroup>
+
+    <Tip>
+      Kali Linux ships with most of these tools pre-installed. If you are running Cairn on Kali, you likely only need to install Cairn's Python dependencies.
+    </Tip>
+  </Step>
+
+  <Step title="Verify the installation">
+    Run the built-in check command to confirm Cairn and its dependencies are correctly installed.
+
+    ```bash
+    python cairn.py --check
+    ```
+
+    You should see output similar to:
+
+    ```
+    Cairn environment check
+    -----------------------
+    Python        3.12.3    OK
+    Config file   not found (run: cp config.example.yaml config.yaml)
+    nmap          7.94      OK
+    ffuf          2.1.0     OK
+    sqlmap        1.8       OK
+    gobuster      3.6.0     OK
+    nikto         not found (optional)
+    ```
+
+    A missing config file is expected at this stage — see the [configuration guide](/configuration) for the next step.
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Configure Cairn" icon="sliders" href="/configuration">
+    Set up your LLM provider, API key, and agent behavior settings
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Run your first automated task end-to-end in minutes
+  </Card>
+</CardGroup>

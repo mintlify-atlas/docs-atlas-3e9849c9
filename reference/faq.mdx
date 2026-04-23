@@ -1,0 +1,133 @@
+---
+title: "Cairn FAQ: legality, providers, scope, cost, and licensing"
+description: "Answers to common questions about Cairn's legality, supported LLM providers, scope enforcement, token costs, CTF use, and commercial licensing."
+---
+
+This page covers the questions asked most often by new and prospective Cairn users. If your question is not answered here, open an issue on the [GitHub repository](https://github.com/oritera/Cairn).
+
+<AccordionGroup>
+
+  <Accordion title="Is Cairn legal to use?">
+    Cairn is a tool, and like any tool its legality depends entirely on how and where you use it.
+
+    Using Cairn against systems you own, systems you have explicit written authorization to test, or isolated lab environments is legal in most jurisdictions. Using Cairn against systems you do not own and have not been authorized to test is illegal in most jurisdictions — regardless of intent — under laws such as the Computer Fraud and Abuse Act (US), the Computer Misuse Act (UK), and equivalents elsewhere.
+
+    <Warning>
+      You are solely responsible for ensuring that you have proper authorization before running Cairn against any target. The maintainers assume no liability for unauthorized use.
+    </Warning>
+
+    Always obtain written authorization before testing. When in doubt, consult a legal professional familiar with your jurisdiction's computer crime laws.
+  </Accordion>
+
+  <Accordion title="What LLM providers does Cairn support?">
+    Cairn currently supports three providers out of the box:
+
+    - **OpenAI** — GPT-4o, GPT-4-turbo, and other OpenAI models that support tool/function calling
+    - **Anthropic** — Claude 3.5 Sonnet, Claude 3 Opus, and other Claude models
+    - **Ollama** — Any model available via the Ollama runtime, including Llama 3, Mistral, and Qwen 2
+
+    Any provider that exposes an OpenAI-compatible API (including many third-party and self-hosted endpoints) can also be used by setting `llm.provider: openai` and pointing `llm.base_url` at the compatible endpoint.
+
+    The model you choose must support tool calling (also called function calling) — models that only do text completion will not work correctly with Cairn's execution loop.
+  </Accordion>
+
+  <Accordion title="Does Cairn work without internet access?">
+    Yes, with some conditions. If you configure Cairn to use Ollama with a locally hosted model, the LLM reasoning loop runs entirely offline. No data leaves your machine during the AI planning and tool-call steps.
+
+    However, the tools Cairn calls — scanners, web request utilities, and so on — may themselves require network access depending on the task. A penetration test against a live target requires network connectivity to that target; a test against a local lab environment does not.
+
+    For fully air-gapped environments, ensure that:
+
+    1. Ollama is installed and your chosen model is pulled locally.
+    2. All tools Cairn uses are available on the host.
+    3. `llm.provider` is set to `ollama` and `llm.base_url` points to your local Ollama instance.
+  </Accordion>
+
+  <Accordion title="How does Cairn handle scope — will it attack systems outside the target?">
+    Cairn's task planner is guided by the goal and target description you provide. It does not autonomously expand scope to systems outside what you specify.
+
+    That said, Cairn is an autonomous system that calls real tools. If a tool call produces output that references an out-of-scope host, the LLM may follow that lead unless you have explicitly constrained the goal. Best practices for scope control:
+
+    - Provide a precise target specification (IP address, CIDR range, or domain) in your task description.
+    - Explicitly state scope limits in the goal prompt: "only target 10.0.0.0/24 — do not probe any host outside this range."
+    - Use `tools.enabled` to restrict which tools are available, reducing the surface area for unexpected behavior.
+
+    <Warning>
+      Do not rely solely on Cairn's AI scope awareness as your only control. Network-level controls (firewalls, VLANs) should be your primary enforcement mechanism for scope boundaries.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="How much does it cost to run Cairn?">
+    Cost depends on the LLM provider you use, the model you choose, the complexity of the task, and the number of iterations required.
+
+    As a rough guide for a moderately complex task (20–40 iterations) using GPT-4o:
+
+    - Input tokens per run: roughly 50,000–200,000 tokens (prompts grow as context accumulates)
+    - Output tokens per run: roughly 5,000–20,000 tokens
+
+    At current OpenAI pricing this translates to approximately $0.50–$5.00 per run, but this varies significantly with task complexity and model choice. Anthropic Claude pricing is similar. Ollama with a local model has no per-token cost.
+
+    <Tip>
+      To control costs during development and testing, set `agent.max_iterations` to a low value (5–10) and use a smaller, cheaper model. Switch to a more capable model for production runs.
+    </Tip>
+  </Accordion>
+
+  <Accordion title="Can Cairn be used for CTF competitions?">
+    Yes. Cairn's autonomous reasoning and tool-use capabilities make it well-suited for Capture the Flag competitions. Cairn was validated in exactly this kind of environment: it was the **sole team to achieve a full score (AK)** in the Tencent Cloud 2nd AI Penetration Challenge, placing 4th overall in the online rankings.
+
+    For CTF use:
+
+    - Set your target to the CTF infrastructure (VM, container, or remote host as provided by the organizer).
+    - Describe the challenge category in your goal prompt (web, binary exploitation, network, etc.) to guide the planner.
+    - Review the `agent.verbose` output to understand how Cairn reasoned through each step — useful for learning from its approach.
+
+    Always verify that the CTF organizer permits the use of automated tooling before running Cairn in a competition context.
+  </Accordion>
+
+  <Accordion title="What makes Cairn different from other automated scanning tools?">
+    Traditional automated security scanners (Nessus, OpenVAS, Nuclei, etc.) run a fixed set of checks in a predetermined order. They are comprehensive within their check library but cannot reason, adapt, or chain findings.
+
+    Cairn's key differences:
+
+    - **Adaptive planning** — Cairn re-plans after each tool call based on what it learns. If a port is closed, it adjusts; if an unexpected service is found, it investigates.
+    - **Goal-directed reasoning** — you specify an objective, not a checklist. Cairn decides which tools to call and in what order.
+    - **Tool chaining** — Cairn can chain tools across steps (for example, use a port scan result to inform a service-specific exploit attempt) rather than running each tool in isolation.
+    - **Natural language interface** — no scripting or configuration of scan templates required for most tasks.
+
+    The trade-off is that Cairn is not a replacement for comprehensive vulnerability databases or established scanner rule sets. It is best used as an autonomous operator that can direct and chain those tools intelligently.
+  </Accordion>
+
+  <Accordion title="Where can I get support or report bugs?">
+    The primary support channel is the GitHub repository:
+
+    - **Bug reports and feature requests** — open an issue at [github.com/oritera/Cairn/issues](https://github.com/oritera/Cairn/issues)
+    - **Questions and discussion** — use the GitHub Discussions tab on the repository
+
+    When reporting a bug, include:
+
+    1. The Cairn version you are using
+    2. Your OS and Python version
+    3. The relevant section of your config file (redact any API keys)
+    4. The full error output or unexpected behavior description
+    5. Steps to reproduce the issue
+  </Accordion>
+
+  <Accordion title="When will the source code be available?">
+    The source code is currently being prepared for open source release. The maintainers are working through code cleanup, documentation, and compliance review before publishing.
+
+    Watch the [GitHub repository](https://github.com/oritera/Cairn) for announcements. You can star or watch the repository to receive notifications when the release is made.
+
+    <Note>
+      The repository and documentation are live now so that early adopters and interested parties can familiarize themselves with Cairn's capabilities and planned architecture ahead of the source release.
+    </Note>
+  </Accordion>
+
+  <Accordion title="Can I use Cairn commercially?">
+    Cairn is licensed under AGPL-3.0. This license permits commercial use with one critical condition: if you run a modified version of Cairn as a network service, you must make the modified source code available to users of that service.
+
+    If AGPL-3.0's terms are incompatible with your use case — for example, if you want to incorporate Cairn into a proprietary product without open-sourcing your modifications — a commercial license is available.
+
+    To request a commercial license, open an issue on the [GitHub repository](https://github.com/oritera/Cairn) or contact the maintainer directly via the repository's contact information. See the [license page](/reference/license) for full details.
+  </Accordion>
+
+</AccordionGroup>

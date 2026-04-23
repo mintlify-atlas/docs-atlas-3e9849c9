@@ -1,0 +1,199 @@
+---
+title: "Cairn configuration reference: all supported YAML keys"
+description: "Complete reference for every Cairn configuration key, including types, defaults, and accepted values for LLM, agent, tool, and output settings."
+---
+
+All Cairn configuration is stored in a YAML file (typically `cairn.yaml`) in your working directory. You can override the config file path with the `--config` flag when running Cairn. Environment variables can substitute for sensitive values such as API keys.
+
+Below is a complete example config file followed by detailed descriptions of every key.
+
+```yaml cairn.yaml
+llm:
+  provider: openai
+  model: gpt-4o
+  api_key: sk-...          # or set CAIRN_LLM_API_KEY
+  base_url: ""             # optional, leave blank to use provider default
+  max_tokens: 4096
+  temperature: 0.2
+
+agent:
+  max_iterations: 30
+  timeout: 600
+  verbose: false
+
+tools:
+  enabled:
+    - nmap
+    - curl
+    - ffuf
+  timeout: 60
+  sandbox: true
+
+output:
+  dir: ./results
+  format: markdown
+```
+
+---
+
+## LLM settings
+
+These keys configure the language model that powers Cairn's reasoning, planning, and tool-selection logic.
+
+<ParamField path="llm.provider" type="string" required>
+  The LLM provider to use. Accepted values:
+
+  - `openai` — OpenAI API (GPT-4o, GPT-4-turbo, etc.)
+  - `anthropic` — Anthropic API (Claude 3.5 Sonnet, Claude 3 Opus, etc.)
+  - `ollama` — Locally hosted models via the Ollama runtime
+
+  Any provider that exposes an OpenAI-compatible API can also be targeted by setting `llm.provider: openai` and overriding `llm.base_url`.
+</ParamField>
+
+<ParamField path="llm.model" type="string" required>
+  The model identifier to request from the provider. Examples:
+
+  - OpenAI: `gpt-4o`, `gpt-4-turbo`, `gpt-3.5-turbo`
+  - Anthropic: `claude-3-5-sonnet-20241022`, `claude-3-opus-20240229`
+  - Ollama: `llama3`, `mistral`, `qwen2`
+
+  The model must support function/tool calling for Cairn to operate correctly.
+</ParamField>
+
+<ParamField path="llm.api_key" type="string">
+  The API key for the selected provider. If left blank, Cairn reads from the `CAIRN_LLM_API_KEY` environment variable. Not required when using Ollama with a locally hosted model.
+
+  <Warning>
+    Never commit your API key to version control. Use the environment variable or a secrets manager instead.
+  </Warning>
+</ParamField>
+
+<ParamField path="llm.base_url" type="string">
+  Override the default API endpoint. Use this when:
+
+  - Running a local Ollama instance at a non-default address
+  - Routing traffic through an API proxy or gateway
+  - Using an OpenAI-compatible third-party provider
+
+  Leave blank or omit to use the provider's standard endpoint.
+
+  **Example:** `http://localhost:11434/v1`
+</ParamField>
+
+<ParamField path="llm.max_tokens" type="integer" default="4096">
+  The maximum number of tokens the model may generate in a single response. Higher values allow longer reasoning traces and more detailed tool-call arguments, at higher cost per request.
+
+  Accepted range: `1` to the model's context limit (varies by provider and model).
+</ParamField>
+
+<ParamField path="llm.temperature" type="number" default="0.2" placeholder="0.0–1.0">
+  Sampling temperature. Controls randomness in model outputs:
+
+  - `0.0` — fully deterministic; model always picks the highest-probability token
+  - `1.0` — highly random; outputs vary significantly between runs
+
+  For penetration testing tasks, a low temperature (0.1–0.3) produces more consistent, predictable tool-call sequences. Higher values may be useful for creative problem-solving tasks.
+</ParamField>
+
+---
+
+## Agent settings
+
+These keys control the behavior of the autonomous agent loop — how many steps it takes, how long it waits, and how much output it produces.
+
+<ParamField path="agent.max_iterations" type="integer" default="30">
+  The maximum number of planning and execution cycles before the agent stops and writes a partial report. Prevents runaway loops on complex or open-ended tasks.
+
+  One iteration corresponds to one LLM reasoning step plus the tool calls it triggers. A full penetration test of a moderately complex target typically requires 15–50 iterations.
+</ParamField>
+
+<ParamField path="agent.timeout" type="integer" default="600">
+  The overall task timeout in seconds. If the agent has not completed when this limit is reached, it is terminated and a partial report is written with all findings collected up to that point.
+
+  This timeout applies to the entire run, not to individual tool calls. For per-tool timeouts, see `tools.timeout`.
+</ParamField>
+
+<ParamField path="agent.verbose" type="boolean" default="false">
+  When set to `true`, Cairn writes detailed logs to stdout, including:
+
+  - The full content of each LLM prompt and response
+  - Tool call arguments and raw output
+  - Planner decisions at each iteration
+
+  Verbose mode is useful for debugging unexpected behavior. Disable it in production to reduce noise.
+</ParamField>
+
+---
+
+## Tool settings
+
+These keys control which tools are available to the agent and how they are executed.
+
+<ParamField path="tools.enabled" type="string[]">
+  An explicit list of tool names to load. Only tools whose names appear in this list will be registered and made available to the LLM.
+
+  If this key is omitted or left as an empty list, all discovered tools are loaded.
+
+  ```yaml
+  tools:
+    enabled:
+      - nmap
+      - curl
+      - ffuf
+      - sqlmap
+  ```
+</ParamField>
+
+<ParamField path="tools.timeout" type="integer" default="60">
+  The maximum time in seconds that any single tool execution may run before it is forcibly terminated. The tool's output up to that point is captured and returned to the LLM.
+
+  Set this high enough to accommodate slow tools (for example, a full `nmap` scan of a /24 network) but low enough to prevent a single stuck tool call from blocking the entire run.
+</ParamField>
+
+<ParamField path="tools.sandbox" type="boolean" default="true">
+  When set to `true`, tools are executed inside an isolated sandbox environment that restricts their access to the host filesystem and network. Recommended for any environment where Cairn may call untrusted tools or process untrusted input.
+
+  <Note>
+    Sandboxing requires appropriate system support (for example, a container runtime). If sandboxing is unavailable, Cairn logs a warning and falls back to unsandboxed execution.
+  </Note>
+</ParamField>
+
+---
+
+## Output settings
+
+These keys control where Cairn writes results and in what format.
+
+<ParamField path="output.dir" type="string" default="./results">
+  The directory where Cairn writes all output: the final report, intermediate findings, and run state for resumability. The directory is created if it does not exist.
+
+  Use an absolute path to ensure consistent output location regardless of the working directory at launch time.
+
+  **Example:** `/var/cairn/results`
+</ParamField>
+
+<ParamField path="output.format" type="string" default="markdown">
+  The format of the final report. Accepted values:
+
+  - `json` — Machine-readable structured output, suitable for feeding into other tools or dashboards
+  - `markdown` — Human-readable report with headings, code blocks, and finding summaries
+  - `html` — Rendered HTML report suitable for sharing with non-technical stakeholders
+
+  Intermediate findings are always written as JSON to the persistence layer regardless of this setting.
+</ParamField>
+
+---
+
+## Environment variable reference
+
+Sensitive values can be provided via environment variables instead of the config file. Environment variables take precedence over config file values.
+
+| Environment variable | Config key equivalent |
+|---|---|
+| `CAIRN_LLM_API_KEY` | `llm.api_key` |
+| `CAIRN_LLM_BASE_URL` | `llm.base_url` |
+| `CAIRN_OUTPUT_DIR` | `output.dir` |
+
+<Tip>
+  If you are running Cairn in CI or a containerized environment, prefer environment variables for all secrets and paths so that the config file can be safely committed to version control.
+</Tip>

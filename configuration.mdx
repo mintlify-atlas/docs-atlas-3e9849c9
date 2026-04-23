@@ -1,0 +1,272 @@
+---
+title: "Configure Cairn: LLM, tools, agent, and output settings"
+description: "Full reference for config.yaml — LLM provider setup, tool paths, agent behavior, logging, and output directory settings for Cairn."
+---
+
+Cairn is configured through a single `config.yaml` file in the project root. This file controls every major aspect of how Cairn operates: which LLM it uses, which tools are enabled, how the agent reasons, and where it writes output. Copy the example file to get started:
+
+```bash
+cp config.example.yaml config.yaml
+```
+
+The sections below explain each part of the configuration file in detail.
+
+## config.yaml structure
+
+A minimal working configuration looks like this:
+
+```yaml
+llm:
+  provider: openai
+  model: gpt-4o
+  api_key: sk-...
+
+tools:
+  enabled: all
+
+agent:
+  max_iterations: 30
+  timeout: 300
+  verbosity: info
+
+output:
+  directory: ./output
+  format: markdown
+```
+
+Every field has a default, so you only need to specify values you want to change from the defaults. The only required field is `llm.api_key`.
+
+## LLM provider configuration
+
+The `llm` section controls which model Cairn uses to plan and execute tasks.
+
+```yaml
+llm:
+  provider: openai          # openai | anthropic | openrouter | local
+  model: gpt-4o             # model identifier for the chosen provider
+  api_key: sk-...           # API key for the provider
+  base_url: ~               # optional: override API endpoint (for local models)
+  temperature: 0.2          # 0.0–2.0, lower = more deterministic
+  max_tokens: 4096          # maximum tokens per LLM response
+```
+
+<AccordionGroup>
+  <Accordion title="OpenAI">
+    ```yaml
+    llm:
+      provider: openai
+      model: gpt-4o          # or: gpt-4-turbo, gpt-4o-mini
+      api_key: sk-...
+    ```
+
+    Get your API key from [platform.openai.com](https://platform.openai.com/api-keys).
+  </Accordion>
+  <Accordion title="Anthropic">
+    ```yaml
+    llm:
+      provider: anthropic
+      model: claude-opus-4   # or: claude-sonnet-4, claude-haiku-3
+      api_key: sk-ant-...
+    ```
+
+    Get your API key from [console.anthropic.com](https://console.anthropic.com/).
+  </Accordion>
+  <Accordion title="OpenRouter">
+    ```yaml
+    llm:
+      provider: openrouter
+      model: google/gemini-2.0-flash-exp
+      api_key: sk-or-...
+    ```
+
+    OpenRouter provides a unified API for many models. Get a key at [openrouter.ai](https://openrouter.ai/).
+  </Accordion>
+  <Accordion title="Local model (Ollama / LM Studio)">
+    ```yaml
+    llm:
+      provider: local
+      model: llama3.1:70b
+      api_key: none          # most local servers don't require a key
+      base_url: http://localhost:11434/v1
+    ```
+
+    Cairn uses the OpenAI-compatible API format. Ollama and LM Studio both expose this endpoint by default.
+
+    <Note>
+      Local models generally produce lower quality reasoning traces than frontier models. For best results with complex tasks, use a hosted provider.
+    </Note>
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  Never commit `config.yaml` to version control. It contains your API key. The `.gitignore` in the repository excludes this file by default.
+</Warning>
+
+## Tool configuration
+
+The `tools` section controls which external tools Cairn can invoke and where to find them.
+
+```yaml
+tools:
+  enabled: all              # all | none | [list of tool names]
+  paths:
+    nmap: /usr/bin/nmap
+    ffuf: /usr/local/bin/ffuf
+    sqlmap: /usr/bin/sqlmap
+    gobuster: /usr/bin/gobuster
+    nikto: /usr/bin/nikto
+```
+
+### Enabling and disabling tools
+
+<CardGroup cols={2}>
+  <Card title="Enable all detected tools" icon="check">
+    ```yaml
+    tools:
+      enabled: all
+    ```
+    Cairn auto-detects tools available on your `PATH`.
+  </Card>
+  <Card title="Disable all tools" icon="ban">
+    ```yaml
+    tools:
+      enabled: none
+    ```
+    Cairn operates using only LLM reasoning, with no external tool calls.
+  </Card>
+</CardGroup>
+
+To enable a specific subset of tools, provide a list:
+
+```yaml
+tools:
+  enabled:
+    - nmap
+    - ffuf
+    - gobuster
+```
+
+### Tool paths
+
+If a tool is not on your `PATH`, or if you want to use a specific installation, set its path explicitly:
+
+```yaml
+tools:
+  paths:
+    nmap: /opt/custom/bin/nmap
+```
+
+<Tip>
+  Run `python cairn.py --check` to see which tools Cairn detects at startup and which paths it is using.
+</Tip>
+
+## Agent behavior settings
+
+The `agent` section controls how Cairn's reasoning loop operates.
+
+```yaml
+agent:
+  max_iterations: 30        # maximum number of planning/execution cycles
+  timeout: 300              # seconds before a single tool call is forcibly stopped
+  verbosity: info           # silent | error | warn | info | debug
+  retry_on_error: true      # retry a failed step before marking it as failed
+  max_retries: 3            # maximum retry attempts per step
+  planning_depth: auto      # shallow | deep | auto
+```
+
+| Field | Default | Description |
+|---|---|---|
+| `max_iterations` | `30` | Caps the total number of reasoning cycles. Increase for complex, multi-phase tasks. |
+| `timeout` | `300` | Per-tool timeout in seconds. Tools that exceed this are terminated and Cairn adapts. |
+| `verbosity` | `info` | Controls terminal output detail. Use `debug` to trace every decision. |
+| `retry_on_error` | `true` | When a tool call fails, Cairn re-attempts before escalating. |
+| `max_retries` | `3` | Number of retry attempts before a step is marked failed. |
+| `planning_depth` | `auto` | `auto` lets the model judge; `deep` forces full upfront planning; `shallow` is faster for simple tasks. |
+
+<Note>
+  Increasing `max_iterations` raises LLM token usage proportionally. Set a reasonable cap for your use case to control costs.
+</Note>
+
+## Logging and output settings
+
+The `output` and `logging` sections control where Cairn writes results and how it logs activity.
+
+```yaml
+output:
+  directory: ./output       # base directory for all task output
+  format: markdown          # markdown | json | both
+  include_trace: true       # write full reasoning trace to trace.json
+  include_raw: true         # save raw tool output alongside the report
+
+logging:
+  level: info               # debug | info | warn | error
+  file: ./cairn.log         # path to log file; omit to log to terminal only
+  rotate: true              # rotate logs when they exceed max_size
+  max_size: 10mb            # maximum size per log file
+```
+
+### Output directory structure
+
+Each task run creates a timestamped subdirectory:
+
+```
+output/
+└── task_2026-04-23_scan_192.168.1.0/
+    ├── report.md           # human-readable findings summary
+    ├── trace.json          # full reasoning and tool call trace
+    └── raw/
+        ├── nmap_output.txt
+        └── ffuf_output.txt
+```
+
+<Tip>
+  Set `format: both` to get both a readable Markdown report and a machine-parseable JSON summary in the same run — useful when integrating Cairn output into downstream pipelines.
+</Tip>
+
+## Full example config.yaml
+
+The following configuration is a reasonable starting point for most use cases:
+
+```yaml
+llm:
+  provider: openai
+  model: gpt-4o
+  api_key: sk-...
+  temperature: 0.2
+  max_tokens: 4096
+
+tools:
+  enabled: all
+  paths: {}                 # auto-detect from PATH
+
+agent:
+  max_iterations: 30
+  timeout: 300
+  verbosity: info
+  retry_on_error: true
+  max_retries: 3
+  planning_depth: auto
+
+output:
+  directory: ./output
+  format: both
+  include_trace: true
+  include_raw: true
+
+logging:
+  level: info
+  file: ./cairn.log
+  rotate: true
+  max_size: 10mb
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Run your first task" icon="rocket" href="/quickstart">
+    Execute a task end-to-end using your configured Cairn setup
+  </Card>
+  <Card title="Configuration options reference" icon="book" href="/reference/configuration-options">
+    Complete list of every supported configuration field and its defaults
+  </Card>
+</CardGroup>

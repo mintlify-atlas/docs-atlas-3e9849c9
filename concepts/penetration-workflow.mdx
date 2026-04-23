@@ -1,0 +1,157 @@
+---
+title: "Penetration testing workflow: phases Cairn automates"
+description: "Explore how Cairn automates the penetration testing lifecycle from reconnaissance to reporting, with scope enforcement and configurable autonomy levels."
+---
+
+Cairn structures every security assessment around the standard penetration testing lifecycle. Rather than treating an engagement as a free-form exploration, it maps the work into distinct phases — each with a defined purpose, a set of appropriate tools, and clear entry and exit criteria. This structure makes assessments reproducible, auditable, and easier to scope.
+
+## Assessment phases
+
+Cairn automates six phases in sequence, though the boundaries between phases are fluid — findings in one phase often trigger actions in an earlier or later phase.
+
+<Steps>
+  <Step title="Reconnaissance">
+    Cairn gathers publicly available information about the target without sending traffic directly to it. This includes DNS enumeration, WHOIS lookups, certificate transparency logs, search engine results, and passive network intelligence. The goal is to build an initial picture of the target's external footprint before active scanning begins.
+
+    **Example tools**: `subfinder`, `amass`, `shodan` (API), `whois`, `crt.sh` (API)
+  </Step>
+  <Step title="Scanning">
+    With a target list established, Cairn performs active network scanning to identify live hosts, open ports, and reachable services. Scan intensity is configurable — from a quick top-1000-ports sweep to a full SYN scan across all 65,535 ports.
+
+    **Example tools**: `nmap`, `masscan`, `zmap`
+  </Step>
+  <Step title="Enumeration">
+    For each identified service, Cairn enumerates details: software versions, exposed endpoints, directory structures, authentication mechanisms, and configuration metadata. This is where surface area is mapped in depth.
+
+    **Example tools**: `nikto`, `gobuster`, `ffuf`, `ssh-audit`, `smbmap`, `enum4linux`
+  </Step>
+  <Step title="Exploitation">
+    Cairn attempts to confirm vulnerabilities by exploiting them in a controlled manner. This phase is gated by scope configuration — exploitation tools are only invoked if active exploitation is explicitly permitted. The agent prioritizes low-impact confirmation methods (e.g., safe check flags in `sqlmap`) before escalating to full exploitation.
+
+    **Example tools**: `sqlmap`, `Metasploit` (via API), `nuclei`, custom exploit scripts
+  </Step>
+  <Step title="Post-exploitation">
+    When a foothold is established, Cairn explores what is accessible from that position: privilege escalation paths, lateral movement opportunities, sensitive data exposure, and persistence mechanisms. Post-exploitation is only entered if exploitation succeeds and the scope permits it.
+
+    **Example tools**: `linpeas`, `winpeas`, `mimikatz` (Windows), credential dumpers
+  </Step>
+  <Step title="Reporting">
+    Cairn compiles all findings into a structured report. Each finding includes a title, severity rating, affected asset, evidence (tool output excerpts), and a recommended remediation step. The report also includes a full reasoning trace showing how Cairn arrived at each conclusion.
+
+    **Output formats**: Markdown, JSON, PDF (via template)
+  </Step>
+</Steps>
+
+## Phase-to-tool mapping
+
+Each phase draws on a specific category of tools. The table below shows how Cairn maps phases to tool categories:
+
+| Phase | Tool category | Purpose |
+|---|---|---|
+| Reconnaissance | OSINT, passive DNS | Gather public data without touching the target |
+| Scanning | Port scanners, host discovery | Identify live hosts and open ports |
+| Enumeration | Web crawlers, service probes | Map service details and exposed endpoints |
+| Exploitation | Exploit frameworks, injection tools | Confirm vulnerabilities with minimal impact |
+| Post-exploitation | Privilege escalation, lateral movement | Assess blast radius from a compromised position |
+| Reporting | Internal generators | Produce structured, human-readable findings |
+
+<Info>
+  Cairn does not require all phases to be enabled. You can configure it to run reconnaissance and scanning only, for example, if you need a non-intrusive assessment. Each phase can be independently enabled or disabled in the session configuration.
+</Info>
+
+## Scope enforcement
+
+Every assessment runs within a declared scope. The scope definition controls what Cairn is allowed to interact with at every phase.
+
+<CardGroup cols={2}>
+  <Card title="Target definition" icon="crosshairs">
+    Scope is defined as a combination of IP ranges (CIDR notation), domain names, and URL prefixes. All tool invocations are validated against this definition before execution.
+  </Card>
+  <Card title="Phase boundaries" icon="shield">
+    Each phase can be independently permitted or restricted. A scope that allows scanning but not exploitation prevents any exploit tools from running, regardless of what the agent's plan proposes.
+  </Card>
+  <Card title="Exclusion lists" icon="ban">
+    Specific hosts, paths, or ports can be explicitly excluded from the scope. Cairn will not interact with excluded targets even if they appear in tool output.
+  </Card>
+  <Card title="Hard stops" icon="octagon-exclamation">
+    If Cairn detects that a planned action would target an out-of-scope asset, it halts that branch of the task graph and records the blocked action in the report rather than silently skipping it.
+  </Card>
+</CardGroup>
+
+```json
+{
+  "scope": {
+    "include": [
+      "192.168.1.0/24",
+      "*.example-target.com"
+    ],
+    "exclude": [
+      "192.168.1.1",
+      "admin.example-target.com"
+    ],
+    "phases": {
+      "reconnaissance": true,
+      "scanning": true,
+      "enumeration": true,
+      "exploitation": false,
+      "post_exploitation": false,
+      "reporting": true
+    }
+  }
+}
+```
+
+## Guided vs. fully autonomous assessment
+
+Cairn supports two operating modes that differ in how much human involvement is required during an assessment.
+
+<AccordionGroup>
+  <Accordion title="Fully autonomous mode">
+    Cairn executes all phases without pausing for human input. It makes all tool-selection, parameter, and re-planning decisions on its own. This mode is appropriate for well-scoped, non-production environments where the risk of unintended impact is low.
+
+    Use fully autonomous mode when:
+    - The target is a dedicated test environment
+    - The scope is tightly defined and bounded
+    - You want to maximize coverage speed without manual intervention
+  </Accordion>
+  <Accordion title="Guided mode">
+    Cairn pauses before each high-impact action — entering the exploitation phase, invoking a destructive tool, or moving to a new target host — and waits for a human approval signal. In between approvals, it operates autonomously within the approved step.
+
+    Use guided mode when:
+    - The target includes production systems or shared infrastructure
+    - The engagement requires a human analyst to review findings before escalation
+    - Compliance or contractual requirements mandate human sign-off on each exploit attempt
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  Fully autonomous exploitation against production systems carries significant risk of service disruption. Always use guided mode when assessing live, business-critical infrastructure.
+</Warning>
+
+## Reporting
+
+At the end of an assessment, Cairn generates a structured report. Reports are designed to be useful to both technical and non-technical audiences.
+
+Each finding in the report contains:
+
+- **Title**: a concise description of the vulnerability or observation
+- **Severity**: Critical, High, Medium, Low, or Informational, following CVSS conventions
+- **Affected asset**: the specific host, port, URL, or service where the finding applies
+- **Evidence**: excerpts from the tool output that confirm the finding
+- **Reasoning trace**: a summary of the steps the agent took to reach the conclusion
+- **Remediation**: a recommended action to address the finding
+
+<Tip>
+  The JSON report format is machine-readable and can be imported into vulnerability management platforms or used as input to a follow-up Cairn session targeting only the confirmed findings.
+</Tip>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Running a scan" icon="play" href="/guides/running-a-scan">
+    Follow a step-by-step guide to launching your first Cairn assessment.
+  </Card>
+  <Card title="Interpreting results" icon="magnifying-glass" href="/guides/interpreting-results">
+    Learn how to read Cairn's report output and prioritize findings.
+  </Card>
+</CardGroup>

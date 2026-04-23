@@ -1,0 +1,91 @@
+---
+title: "Cairn licensing: AGPL-3.0 terms and commercial options"
+description: "Cairn is released under AGPL-3.0. Understand what this means for personal, educational, and commercial use, and how to request a commercial license."
+---
+
+Cairn is released under the [GNU Affero General Public License v3.0 (AGPL-3.0)](https://github.com/oritera/Cairn/blob/main/LICENSE). This page explains what that means in plain terms, who needs a commercial license, and how contributions are handled.
+
+## What AGPL-3.0 means for you
+
+AGPL-3.0 is a strong copyleft open source license. It gives you broad rights to use, study, modify, and distribute Cairn — with one key condition that goes further than the standard GPL.
+
+<CardGroup cols={2}>
+  <Card title="Use freely" icon="circle-check">
+    Run Cairn for any purpose: personal projects, research, education, internal security assessments, or CTF competitions.
+  </Card>
+  <Card title="Modify the code" icon="code">
+    Read, edit, and adapt the source to your needs. You are not required to publish modifications that you use privately.
+  </Card>
+  <Card title="Distribute copies" icon="share-nodes">
+    Share Cairn or your modified version with others, provided you include the AGPL-3.0 license and make the full corresponding source available.
+  </Card>
+  <Card title="Network use triggers sharing" icon="network-wired">
+    If you run a modified version of Cairn as a service that others interact with over a network, you must make your modified source code available to those users. This is the key AGPL addition over standard GPL.
+  </Card>
+</CardGroup>
+
+<Note>
+  The AGPL-3.0 network provision applies to modified versions. If you run an unmodified copy of Cairn as a network service, you still need to comply with the license terms, but you are not required to publish any additional source since the original source is already public.
+</Note>
+
+## Personal and educational use
+
+Personal and educational use of Cairn is free under AGPL-3.0. This covers:
+
+- Individual security researchers and penetration testers using Cairn on systems they are authorized to test
+- Students and academics studying AI-driven security automation
+- CTF competitors using Cairn in competition environments that permit automated tooling
+- Hobbyists exploring autonomous agent systems
+
+No registration, payment, or additional agreement is required for these use cases.
+
+## Commercial use
+
+AGPL-3.0 permits commercial use. You can use Cairn in a commercial context without a separate license as long as you comply with all AGPL-3.0 obligations — most importantly, the source-sharing requirement for network services.
+
+A commercial license is required (or strongly recommended) if:
+
+- You want to incorporate Cairn into a proprietary product and distribute it without making your modifications public
+- You are building a SaaS or managed service on top of Cairn and the AGPL-3.0 network provision is incompatible with your business model
+- You need contractual warranty, indemnification, or support terms that the AGPL-3.0 does not provide
+- Your legal or compliance team requires a non-copyleft license for your software stack
+
+<Warning>
+  If you are uncertain whether your use case requires a commercial license, consult your legal team before shipping. The AGPL-3.0 network provision is broader than most developers expect.
+</Warning>
+
+## How to request a commercial license
+
+<Steps>
+  <Step title="Review your use case">
+    Confirm that your intended use falls outside what AGPL-3.0 permits without a commercial agreement. The FAQ question ["Can I use Cairn commercially?"](/reference/faq) covers common scenarios.
+  </Step>
+  <Step title="Open an issue or contact the maintainer">
+    Open an issue on the [Cairn GitHub repository](https://github.com/oritera/Cairn) with the subject "Commercial license inquiry" and a brief description of your intended use. Alternatively, contact the maintainer directly using the contact information on the repository profile.
+  </Step>
+  <Step title="Discuss terms">
+    The maintainer will respond to discuss your use case and the terms of a commercial license. Commercial licensing is handled individually to accommodate varying needs.
+  </Step>
+</Steps>
+
+## Contributions
+
+Cairn welcomes contributions from the community. Before submitting a pull request, note the following:
+
+By submitting a contribution to the Cairn repository, you agree that:
+
+- Your contribution may be used under the AGPL-3.0 license, the same as the rest of the project.
+- The maintainer may also include your contribution in commercially licensed versions of Cairn.
+
+This dual-use arrangement (sometimes called a Contributor License Agreement, or CLA) allows the project to remain open source while also making a commercial license offering viable. You retain copyright over your own contributions.
+
+<Info>
+  If you have concerns about the contribution terms or need to discuss licensing your contributions under different conditions, open an issue on the repository before submitting your pull request.
+</Info>
+
+## Full license text
+
+The complete text of the GNU Affero General Public License v3.0 is available at:
+
+- [github.com/oritera/Cairn/blob/main/LICENSE](https://github.com/oritera/Cairn/blob/main/LICENSE) — the license as included in the Cairn repository
+- [gnu.org/licenses/agpl-3.0.html](https://www.gnu.org/licenses/agpl-3.0.html) — the canonical GNU version with additional commentary
